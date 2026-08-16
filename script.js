@@ -4,6 +4,8 @@ const distEl = document.getElementById('dist');
 const bestEl = document.getElementById('best');
 const stepreadEl = document.getElementById('stepread');
 const stepEl = document.getElementById('step');
+const speedEl = document.getElementById('speed');
+const speedreadEl = document.getElementById('speedread');
 const countEl = document.getElementById('count');
 const countreadEl = document.getElementById('countread');
 const playBtn = document.getElementById('play');
@@ -26,14 +28,16 @@ window.addEventListener('resize', resize);
 resize();
 
 // --- модель ---
-// count путников (ползунок 1..1000), рандомный старт под углом, у каждого
-// ФИКСИРОВАННАЯ скорость. Каждый кадр шаг = S * dt * скорость. Шаг фиксированный
-// -> под дистанцию не подогнать -> путник вечно ПЕРЕСКАКИВАЕТ цель, остановиться
-// не может. Чем больше скорость, тем больше перескок/разброс; при огромной —
-// улетает в бесконечность. За каждой точкой тянется шлейф из TRAIL позиций.
-let count = 1;      // число путников (ползунок 1..1000)
-const TRAIL = 10;   // длина шлейфа за точкой (>= 5)
+// count путников (ползунок 1..1000), рандомный старт под углом. Путник делает
+// ДИСКРЕТНЫЕ шаги фиксированной длины (= "шаг") к цели: длину не подогнать под
+// дистанцию, поэтому он вечно ПЕРЕСКАКИВАЕТ цель и не может остановиться.
+// "скорость" — это скорость АНИМАЦИИ (тайм-скейл): плавно проигрывает те же
+// шаги медленнее/быстрее (интерполяция между шагами), чтобы рассмотреть перескок.
+// Величина шага от скорости анимации НЕ зависит. Шлейф — TRAIL последних позиций.
+let count = 1;              // число путников (ползунок 1..1000)
+const TRAIL = 10;          // длина шлейфа за точкой (>= 5)
 const NEAR = 60;
+const STRIDE_DT = 1 / 60;  // опорный интервал одного шага (сим-секунды)
 
 // --- таймлайн шага, привязанный к словам озвучки (timeline.js) ---
 const TL = window.TIMELINE;
@@ -81,6 +85,9 @@ function reset(freshField = true) {
         S: 250 + Math.random() * 550,
         // выражённый угол захода — путник летит к цели ПОД УГЛОМ, по спирали
         turn: (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35),
+        from: { x, y },
+        to: { x, y },
+        phase: 1,               // >=1 -> первый шаг посчитается сразу
         trail: [{ x, y }],
       };
     }
@@ -92,30 +99,36 @@ function reset(freshField = true) {
   ctx.fillRect(0, 0, W, H);
 }
 
-function step(p, dt) {
-  const dx = cx - p.x;
-  const dy = cy - p.y;
-  const dist = Math.max(1e-6, Math.hypot(dx, dy));
-  let ux = dx / dist, uy = dy / dist;
+// следующий шаг фиксированной длины из точки (ox,oy), направление под углом turn
+function strideFrom(p, ox, oy) {
+  const dx = cx - ox, dy = cy - oy;
+  const d = Math.max(1e-6, Math.hypot(dx, dy));
+  const ux = dx / d, uy = dy / d;
   const c = Math.cos(p.turn), s = Math.sin(p.turn);
   const rx = ux * c - uy * s;
   const ry = ux * s + uy * c;
-  const move = p.S * dt * stepScale;   // фиксированный шаг -> перескок
-  p.x += rx * move;
-  p.y += ry * move;
+  const L = p.S * stepScale * STRIDE_DT;   // длина шага = "шаг", от скорости анимации не зависит
+  return { x: ox + rx * L, y: oy + ry * L };
 }
 
-function simulate(realDt) {
+function simulate(realDt, animSpeed) {
   simTime += realDt;
+  const adv = (realDt * animSpeed) / STRIDE_DT;   // сколько шагов проиграть за кадр
   let alive = 0;
 
   for (let i = 0; i < count; i++) {
     const p = particles[i];
-    let dt = Math.min(realDt + Math.random() * 2e-4, 0.3);
+    p.phase += adv;
+    let guard = 0;
+    while (p.phase >= 1 && guard++ < 4000) {
+      p.phase -= 1;
+      p.from = p.to;
+      p.to = strideFrom(p, p.to.x, p.to.y);   // новый шаг фиксированной длины
+    }
+    // плавно интерполируем позицию внутри текущего шага
+    p.x = p.from.x + (p.to.x - p.from.x) * p.phase;
+    p.y = p.from.y + (p.to.y - p.from.y) * p.phase;
 
-    step(p, dt);
-
-    // шлейф: запоминаем последние TRAIL позиций
     p.trail.push({ x: p.x, y: p.y });
     if (p.trail.length > TRAIL) p.trail.shift();
 
@@ -213,6 +226,7 @@ function loop(now) {
   t0 = now;
   realDt = Math.min(realDt, 0.05);
 
+  let animSpeed = 1;   // в озвучке — реальное время (синк с аудио)
   if (mode === 'play') {
     const at = narration.currentTime;
     stepScale = stepFromTime(at);
@@ -220,13 +234,15 @@ function loop(now) {
     if (narration.ended || at >= TL.duration - 0.02) enterStop();
   } else if (mode === 'idle') {
     stepScale = parseFloat(stepEl.value);
+    animSpeed = parseFloat(speedEl.value);
   }
 
   if (mode !== 'stop') {
-    const alive = simulate(realDt);
+    const alive = simulate(realDt, animSpeed);
     distEl.textContent = 'у цели: ' + alive + ' / ' + count;
     bestEl.textContent = 'ближе всего: ' + globalBest.toFixed(4) + ' px';
-    stepreadEl.textContent = 'скорость ×' + stepScale.toFixed(2);
+    stepreadEl.textContent = '×' + stepScale.toFixed(1);
+    speedreadEl.textContent = '×' + animSpeed.toFixed(2);
   }
 
   ctx.fillStyle = '#0b0e14';

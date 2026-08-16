@@ -45,16 +45,19 @@ html, body {
 /* фикс-ширина числовых полей, чтобы шапка не прыгала */
 #dist    { display: inline-block; width: 96px;  white-space: nowrap; }
 #best    { display: inline-block; width: 176px; white-space: nowrap; }
-#stepread{ display: inline-block; width: 116px; white-space: nowrap; color: #cdd6e6; }
-#countread { display: inline-block; width: 44px; text-align: right; color: #cdd6e6; }
+#countread,
+#stepread,
+#speedread { display: inline-block; width: 46px; text-align: right; color: #cdd6e6; }
 
 .ctl {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
-#count { width: 140px; accent-color: #5db4ff; cursor: pointer; }
-#step  { width: 200px; accent-color: #5db4ff; cursor: pointer; }
+#count { width: 120px; accent-color: #5db4ff; cursor: pointer; }
+#step  { width: 150px; accent-color: #5db4ff; cursor: pointer; }
+#speed { width: 130px; accent-color: #5db4ff; cursor: pointer; }
 
 #restart {
   background: #1a2130;
