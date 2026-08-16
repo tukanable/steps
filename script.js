@@ -44,6 +44,36 @@ function updateOutroFade() {
   outro.volume = Math.max(0, Math.min(OUTRO_VOL, v));
 }
 
+// --- бит-детекция по звуку outro (Web Audio) ---
+let audioCtx, analyser, freqData, audioWired = false;
+let beatAvg = 0, beatEnv = 0;
+function wireAudio() {
+  if (audioWired || !outro) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaElementSource(outro);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);   // чтобы звук был слышен
+    audioWired = true;
+  } catch (e) {}
+}
+// возвращает 0..1 — импульс на бите (всплеск баса над средним), иначе ~0
+function beatBoost() {
+  if (!analyser || !outro || outro.paused) { beatEnv *= 0.85; return beatEnv; }
+  analyser.getByteFrequencyData(freqData);
+  const n = Math.max(1, freqData.length >> 3);   // низкие частоты — кик/бас
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += freqData[i];
+  const e = sum / n / 255;                        // энергия баса 0..1
+  beatAvg = beatAvg * 0.95 + e * 0.05;            // медленное среднее
+  const onset = Math.max(0, e - beatAvg * 1.25);  // всплеск над средним = бит
+  beatEnv = Math.max(beatEnv * 0.85, Math.min(1, onset * 4));  // атака резкая, спад плавный
+  return beatEnv;
+}
+
 let W, H, cx, cy;
 function resize() {
   const dpr = window.devicePixelRatio || 1;
@@ -292,8 +322,8 @@ function loop(now) {
     animSpeed = parseFloat(speedEl.value);
   }
 
-  // музыко-реактивно: текущая громкость outro ускоряет частицы (макс +OUTRO_SPEED)
-  if (outro && !outro.paused) animSpeed += OUTRO_SPEED * (outro.volume / OUTRO_VOL);
+  // музыко-реактивно: на каждый бит — короткий импульс скорости (макс +OUTRO_SPEED)
+  animSpeed += OUTRO_SPEED * beatBoost();
 
   const alive = simulate(realDt, animSpeed);
   distEl.textContent = 'у цели: ' + alive + ' / ' + count;
@@ -321,6 +351,8 @@ function play() {
   subEl.style.display = '';
   subEl.classList.remove('show');
   playBtn.disabled = true;
+  wireAudio();                                              // клик по Play = жест, можно поднять AudioContext
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   stopOutro();
   narration.currentTime = 0;
   narration.play().catch(() => {});
