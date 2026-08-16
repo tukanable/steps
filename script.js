@@ -49,14 +49,15 @@ const STEP_KF = [
   [A.bolshe,    3 ],  // "чем больше шаг"
   [A.promah,    12],  // "промахивается" — большой перескок
   [A.eto,       7 ],  // "это один путник" — фиксируем средний
-  [TL.duration, 7 ],
+  [A.pulse,     12],  // "пульсировать" — раскачиваем
+  [TL.duration, 25],  // к концу шаг 25 — крупная пульсация
 ];
 // скорость анимации по словам (минимальная — чтобы рассмотреть пульсацию)
 const SPEED_KF = [
-  [0,            0.15],
-  [A.eto,        0.15],  // держим, пока показываем одного путника и набор ста
-  [A.minimalnoy, 0.05],  // "скорость оставим минимальной"
-  [TL.duration,  0.05],
+  [0,            0.15 ],
+  [A.eto,        0.15 ],  // держим, пока показываем одного путника и набор ста
+  [A.minimalnoy, 0.025],  // "скорость оставим минимальной" — совсем медленно
+  [TL.duration,  0.025],
 ];
 // число точек — ступенями по словам
 const COUNT_CUES = [
@@ -88,7 +89,7 @@ function countFromTime(t) {
 
 let particles;
 let stepScale = 1;
-let mode = 'idle';        // 'idle' (ручной) | 'play' (озвучка) | 'stop' (стоп-кадр)
+let mode = 'idle';        // 'idle' (ручной) | 'play' (озвучка, анимация не встаёт)
 let globalBest;
 let simTime;
 let t0;
@@ -233,14 +234,6 @@ function drawParticles() {
   }
 }
 
-// финал — просто остановка (стоп-кадр). Последний субтитр остаётся.
-function enterStop() {
-  if (mode === 'stop') return;
-  mode = 'stop';
-  playBtn.disabled = false;
-  playBtn.textContent = '▶ Play';
-}
-
 // --- главный цикл ---
 function loop(now) {
   if (t0 === null) t0 = now;
@@ -261,19 +254,17 @@ function loop(now) {
       reset(true);            // добавляем/пересоздаём путников — влетают заново
     }
     updateSubtitle(at);
-    if (narration.ended || at >= TL.duration - 0.02) enterStop();
+    // конец озвучки не останавливает анимацию — точки продолжают пульсировать
   } else if (mode === 'idle') {
     stepScale = parseFloat(stepEl.value);
     animSpeed = parseFloat(speedEl.value);
   }
 
-  if (mode !== 'stop') {
-    const alive = simulate(realDt, animSpeed);
-    distEl.textContent = 'у цели: ' + alive + ' / ' + count;
-    bestEl.textContent = 'ближе всего: ' + globalBest.toFixed(4) + ' px';
-    stepreadEl.textContent = '×' + stepScale.toFixed(1);
-    speedreadEl.textContent = '×' + animSpeed.toFixed(2);
-  }
+  const alive = simulate(realDt, animSpeed);
+  distEl.textContent = 'у цели: ' + alive + ' / ' + count;
+  bestEl.textContent = 'ближе всего: ' + globalBest.toFixed(4) + ' px';
+  stepreadEl.textContent = '×' + stepScale.toFixed(1);
+  speedreadEl.textContent = '×' + animSpeed.toFixed(3);
 
   ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, W, H);
@@ -312,11 +303,14 @@ restartBtn.addEventListener('click', () => {
 countEl.addEventListener('input', () => {
   count = parseInt(countEl.value, 10);
   countreadEl.textContent = count;
-  if (mode === 'stop') { mode = 'idle'; playBtn.disabled = false; }
   reset(true);
 });
 
-narration.addEventListener('ended', () => { if (mode === 'play') enterStop(); });
+// озвучка кончилась — даём повторить, но анимация продолжает идти (пульсация)
+narration.addEventListener('ended', () => {
+  playBtn.disabled = false;
+  playBtn.textContent = '▶ Play';
+});
 
 reset(true);
 requestAnimationFrame(loop);
