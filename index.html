@@ -13,10 +13,15 @@
     <button id="play">▶ Play</button>
     <span id="dist">у цели: —</span>
     <span id="best">ближе всего: —</span>
-    <span id="stepread">шаг ×1.00</span>
-    <label id="stepctl">
-      ручной шаг
-      <input type="range" id="step" min="0" max="30" step="0.1" value="5">
+    <span id="stepread">скорость ×0.50</span>
+    <label class="ctl">
+      точек
+      <input type="range" id="count" min="1" max="1000" step="1" value="1">
+      <span id="countread">1</span>
+    </label>
+    <label class="ctl">
+      скорость
+      <input type="range" id="step" min="0" max="3" step="0.01" value="0.5">
     </label>
     <button id="restart">Заново</button>
   </div>

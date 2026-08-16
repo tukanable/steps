@@ -42,18 +42,19 @@ html, body {
 #play:hover { background: #7cc3ff; }
 #play:disabled { opacity: 0.5; cursor: default; }
 
-#stepread { color: #cdd6e6; min-width: 74px; }
+/* фикс-ширина числовых полей, чтобы шапка не прыгала */
+#dist    { display: inline-block; width: 96px;  white-space: nowrap; }
+#best    { display: inline-block; width: 176px; white-space: nowrap; }
+#stepread{ display: inline-block; width: 116px; white-space: nowrap; color: #cdd6e6; }
+#countread { display: inline-block; width: 44px; text-align: right; color: #cdd6e6; }
 
-#stepctl {
+.ctl {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-#step {
-  width: 260px;
-  accent-color: #5db4ff;
-  cursor: pointer;
-}
+#count { width: 140px; accent-color: #5db4ff; cursor: pointer; }
+#step  { width: 200px; accent-color: #5db4ff; cursor: pointer; }
 
 #restart {
   background: #1a2130;

@@ -4,6 +4,8 @@ const distEl = document.getElementById('dist');
 const bestEl = document.getElementById('best');
 const stepreadEl = document.getElementById('stepread');
 const stepEl = document.getElementById('step');
+const countEl = document.getElementById('count');
+const countreadEl = document.getElementById('countread');
 const playBtn = document.getElementById('play');
 const restartBtn = document.getElementById('restart');
 const subEl = document.getElementById('subtitle');
@@ -24,12 +26,13 @@ window.addEventListener('resize', resize);
 resize();
 
 // --- модель ---
-// 1000 путников, рандомный старт, у каждого ФИКСИРОВАННАЯ скорость.
-// Каждый кадр шаг = S * dt * step. Шаг фиксированный -> под дистанцию не
-// подогнать -> путник вечно ПЕРЕСКАКИВАЕТ цель, остановиться не может.
-// Чем больше шаг, тем больше перескок/разброс; при огромном шаге —
-// улетает в бесконечность.
-const N = 1000;
+// count путников (ползунок 1..1000), рандомный старт под углом, у каждого
+// ФИКСИРОВАННАЯ скорость. Каждый кадр шаг = S * dt * скорость. Шаг фиксированный
+// -> под дистанцию не подогнать -> путник вечно ПЕРЕСКАКИВАЕТ цель, остановиться
+// не может. Чем больше скорость, тем больше перескок/разброс; при огромной —
+// улетает в бесконечность. За каждой точкой тянется шлейф из TRAIL позиций.
+let count = 1;      // число путников (ползунок 1..1000)
+const TRAIL = 10;   // длина шлейфа за точкой (>= 5)
 const NEAR = 60;
 
 // --- таймлайн шага, привязанный к словам озвучки (timeline.js) ---
@@ -66,17 +69,19 @@ let t0;
 
 function reset(freshField = true) {
   if (freshField) {
-    particles = new Array(N);
+    particles = new Array(count);
     const Rmax = Math.min(W, H) * 0.42;
-    for (let i = 0; i < N; i++) {
+    for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
       const r = Rmax * (0.55 + Math.random() * 0.45);
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
       particles[i] = {
-        x: cx + Math.cos(ang) * r,
-        y: cy + Math.sin(ang) * r,
+        x, y,
         S: 250 + Math.random() * 550,
-        turn: (Math.random() - 0.5) * 0.5,
-        lagBias: 0.5 + Math.random(),
+        // выражённый угол захода — путник летит к цели ПОД УГЛОМ, по спирали
+        turn: (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35),
+        trail: [{ x, y }],
       };
     }
   }
@@ -104,11 +109,15 @@ function simulate(realDt) {
   simTime += realDt;
   let alive = 0;
 
-  for (let i = 0; i < N; i++) {
+  for (let i = 0; i < count; i++) {
     const p = particles[i];
     let dt = Math.min(realDt + Math.random() * 2e-4, 0.3);
 
     step(p, dt);
+
+    // шлейф: запоминаем последние TRAIL позиций
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > TRAIL) p.trail.shift();
 
     const dist = Math.hypot(cx - p.x, cy - p.y);
     if (dist < globalBest) globalBest = dist;
@@ -170,10 +179,21 @@ function drawTarget() {
 
 function drawParticles() {
   ctx.fillStyle = '#5db4ff';
-  for (let i = 0; i < N; i++) {
+  for (let i = 0; i < count; i++) {
     const p = particles[i];
+    const tl = p.trail;
+    // шлейф — от старого к новому, растёт по яркости и размеру
+    for (let j = 0; j < tl.length; j++) {
+      const a = (j + 1) / (tl.length + 1);
+      ctx.globalAlpha = a * 0.5;
+      ctx.beginPath();
+      ctx.arc(tl[j].x, tl[j].y, 0.7 + 1.6 * a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // голова
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 1.7, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -204,12 +224,12 @@ function loop(now) {
 
   if (mode !== 'stop') {
     const alive = simulate(realDt);
-    distEl.textContent = 'у цели: ' + alive + ' / ' + N;
+    distEl.textContent = 'у цели: ' + alive + ' / ' + count;
     bestEl.textContent = 'ближе всего: ' + globalBest.toFixed(4) + ' px';
-    stepreadEl.textContent = 'шаг ×' + stepScale.toFixed(2);
+    stepreadEl.textContent = 'скорость ×' + stepScale.toFixed(2);
   }
 
-  ctx.fillStyle = 'rgba(11,14,20,0.16)';
+  ctx.fillStyle = '#0b0e14';
   ctx.fillRect(0, 0, W, H);
   drawParticles();
   drawTarget();
@@ -237,6 +257,13 @@ restartBtn.addEventListener('click', () => {
   playBtn.textContent = '▶ Play';
   subEl.style.display = '';
   subEl.classList.remove('show');
+  reset(true);
+});
+
+countEl.addEventListener('input', () => {
+  count = parseInt(countEl.value, 10);
+  countreadEl.textContent = count;
+  if (mode === 'stop') { mode = 'idle'; playBtn.disabled = false; }
   reset(true);
 });
 
