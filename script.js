@@ -74,7 +74,7 @@ function reset(freshField = true) {
       particles[i] = {
         x: cx + Math.cos(ang) * r,
         y: cy + Math.sin(ang) * r,
-        S: 50 + Math.random() * 70,
+        S: 250 + Math.random() * 550,
         turn: (Math.random() - 0.5) * 0.5,
         lagBias: 0.5 + Math.random(),
       };
