@@ -61,17 +61,19 @@ function wireAudio() {
     audioWired = true;
   } catch (e) {}
 }
-// возвращает 0..1 — импульс на бите (всплеск баса над средним), иначе ~0
+// возвращает 0..1 — импульс на пике ГРОМКОСТИ (RMS над средним), иначе ~0
 function beatBoost() {
-  if (!analyser || !outro || outro.paused) { beatEnv *= 0.85; return beatEnv; }
-  analyser.getByteFrequencyData(freqData);
-  const n = Math.max(1, freqData.length >> 3);   // низкие частоты — кик/бас
+  if (!analyser || !outro || outro.paused) { beatEnv *= 0.82; return beatEnv; }
+  analyser.getByteTimeDomainData(freqData);        // форма волны, весь сигнал
   let sum = 0;
-  for (let i = 0; i < n; i++) sum += freqData[i];
-  const e = sum / n / 255;                        // энергия баса 0..1
-  beatAvg = beatAvg * 0.95 + e * 0.05;            // медленное среднее
-  const onset = Math.max(0, e - beatAvg * 1.25);  // всплеск над средним = бит
-  beatEnv = Math.max(beatEnv * 0.85, Math.min(1, onset * 4));  // атака резкая, спад плавный
+  for (let i = 0; i < freqData.length; i++) {
+    const v = (freqData[i] - 128) / 128;           // -1..1
+    sum += v * v;
+  }
+  const e = Math.sqrt(sum / freqData.length);      // громкость (RMS) 0..1
+  beatAvg = beatAvg * 0.9 + e * 0.1;               // быстрое среднее
+  const onset = Math.max(0, e - beatAvg * 1.15);   // пик громкости над средним
+  beatEnv = Math.max(beatEnv * 0.82, Math.min(1, onset * 5));  // атака резкая, спад плавный
   return beatEnv;
 }
 
