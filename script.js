@@ -13,7 +13,7 @@ const restartBtn = document.getElementById('restart');
 const subEl = document.getElementById('subtitle');
 const narration = document.getElementById('narration');
 const bgm = document.getElementById('bgm');
-bgm.volume = 0.2;   // lofi фоном на 20% под голос
+if (bgm) bgm.volume = 0.2;
 
 let W, H, cx, cy;
 function resize() {
@@ -40,6 +40,7 @@ let count = 1;              // число путников (ползунок 1..
 const TRAIL = 10;          // длина шлейфа за точкой (>= 5)
 const NEAR = 60;
 const STRIDE_DT = 1 / 60;  // опорный интервал одного шага (сим-секунды)
+const JITTER = 0.6;        // ± случайное отклонение направления от «на цель», рад
 
 // --- таймлайн шага, привязанный к словам озвучки (timeline.js) ---
 const TL = window.TIMELINE;
@@ -102,14 +103,12 @@ function reset(freshField = true) {
     const Rmax = Math.min(W, H) * 0.42;
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const r = Rmax * (0.55 + Math.random() * 0.45);
+      const r = Rmax * (0.15 + Math.random() * 0.85);   // разное расстояние от центра
       const x = cx + Math.cos(ang) * r;
       const y = cy + Math.sin(ang) * r;
       particles[i] = {
         x, y,
-        S: 250 + Math.random() * 550,
-        // выражённый угол захода — путник летит к цели ПОД УГЛОМ, по спирали
-        turn: (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35),
+        S: 200 + Math.random() * 650,                    // чуть разная скорость у каждого
         from: { x, y },
         to: { x, y },
         phase: 1,               // >=1 -> первый шаг посчитается сразу
@@ -129,7 +128,9 @@ function strideFrom(p, ox, oy) {
   const dx = cx - ox, dy = cy - oy;
   const d = Math.max(1e-6, Math.hypot(dx, dy));
   const ux = dx / d, uy = dy / d;
-  const c = Math.cos(p.turn), s = Math.sin(p.turn);
+  // направление — НА цель, но со случайным отклонением каждый шаг: rand(-JITTER, +JITTER)
+  const ang = (Math.random() * 2 - 1) * JITTER;
+  const c = Math.cos(ang), s = Math.sin(ang);
   const rx = ux * c - uy * s;
   const ry = ux * s + uy * c;
   const L = p.S * stepScale * STRIDE_DT;   // длина шага = "шаг", от скорости анимации не зависит
