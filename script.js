@@ -12,8 +12,36 @@ const playBtn = document.getElementById('play');
 const restartBtn = document.getElementById('restart');
 const subEl = document.getElementById('subtitle');
 const narration = document.getElementById('narration');
-const bgm = document.getElementById('bgm');
-if (bgm) bgm.volume = 0.2;
+// музыка после реплик: играет один раз, первые 33с, с fade in/out.
+// файл outro.mp3 кладётся в папку проекта (свой вырезанный клип).
+const outro = document.getElementById('outro');
+const OUTRO_VOL = 0.7;   // громкость музыки
+const OUTRO_LEN = 33;    // играем только первые 33 секунды
+const OUTRO_FADE = 1.6;  // fade in / fade out, сек
+
+function startOutro() {
+  if (!outro) return;
+  try {
+    outro.currentTime = 0;
+    outro.volume = 0;
+    outro.play().catch(() => {});
+  } catch (e) {}
+}
+function stopOutro() {
+  if (!outro) return;
+  try { outro.pause(); outro.currentTime = 0; } catch (e) {}
+}
+function updateOutroFade() {
+  if (!outro || outro.paused) return;
+  const dur = (isFinite(outro.duration) && outro.duration > 0) ? outro.duration : OUTRO_LEN;
+  const end = Math.min(dur, OUTRO_LEN);
+  const t = outro.currentTime;
+  if (t >= end) { outro.pause(); outro.volume = 0; return; }   // один раз, первые 33с
+  let v = OUTRO_VOL;
+  if (t < OUTRO_FADE) v = OUTRO_VOL * (t / OUTRO_FADE);                       // fade in
+  else if (t > end - OUTRO_FADE) v = OUTRO_VOL * (end - t) / OUTRO_FADE;      // fade out
+  outro.volume = Math.max(0, Math.min(OUTRO_VOL, v));
+}
 
 let W, H, cx, cy;
 function resize() {
@@ -274,6 +302,7 @@ function loop(now) {
   drawParticles();
   drawTarget();
 
+  updateOutroFade();
   requestAnimationFrame(loop);
 }
 
@@ -288,14 +317,15 @@ function play() {
   subEl.style.display = '';
   subEl.classList.remove('show');
   playBtn.disabled = true;
+  stopOutro();
   narration.currentTime = 0;
   narration.play().catch(() => {});
-  try { bgm.currentTime = 0; bgm.volume = 0.2; bgm.play().catch(() => {}); } catch (e) {}
 }
 playBtn.addEventListener('click', play);
 
 restartBtn.addEventListener('click', () => {
-  try { narration.pause(); bgm.pause(); } catch (e) {}
+  try { narration.pause(); } catch (e) {}
+  stopOutro();
   mode = 'idle';
   playBtn.disabled = false;
   playBtn.textContent = '▶ Play';
@@ -314,6 +344,7 @@ countEl.addEventListener('input', () => {
 narration.addEventListener('ended', () => {
   playBtn.disabled = false;
   playBtn.textContent = '▶ Play';
+  startOutro();   // музыка вступает после реплик
 });
 
 reset(true);
