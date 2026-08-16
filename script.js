@@ -23,6 +23,7 @@ const OUTRO_SPEED = 0.05; // макс добавка к скорости час�
 function startOutro() {
   if (!outro) return;
   try {
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     outro.currentTime = 0;
     outro.volume = 0;
     outro.play().catch(() => {});
@@ -55,8 +56,8 @@ function wireAudio() {
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
     freqData = new Uint8Array(analyser.frequencyBinCount);
-    src.connect(analyser);
-    analyser.connect(audioCtx.destination);   // чтобы звук был слышен
+    src.connect(analyser);              // анализ баса
+    src.connect(audioCtx.destination);  // звук напрямую на колонки (параллельно) — гарантированно слышно
     audioWired = true;
   } catch (e) {}
 }
