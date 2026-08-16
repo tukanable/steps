@@ -12,6 +12,8 @@ const playBtn = document.getElementById('play');
 const restartBtn = document.getElementById('restart');
 const subEl = document.getElementById('subtitle');
 const narration = document.getElementById('narration');
+const bgm = document.getElementById('bgm');
+bgm.volume = 0.2;   // lofi фоном на 20% под голос
 
 let W, H, cx, cy;
 function resize() {
@@ -286,12 +288,13 @@ function play() {
   subEl.classList.remove('show');
   playBtn.disabled = true;
   narration.currentTime = 0;
-  narration.play();
+  narration.play().catch(() => {});
+  try { bgm.currentTime = 0; bgm.volume = 0.2; bgm.play().catch(() => {}); } catch (e) {}
 }
 playBtn.addEventListener('click', play);
 
 restartBtn.addEventListener('click', () => {
-  try { narration.pause(); } catch (e) {}
+  try { narration.pause(); bgm.pause(); } catch (e) {}
   mode = 'idle';
   playBtn.disabled = false;
   playBtn.textContent = '▶ Play';
