@@ -18,6 +18,7 @@ const outro = document.getElementById('outro');
 const OUTRO_VOL = 0.7;   // громкость музыки
 const OUTRO_LEN = 33;    // играем только первые 33 секунды
 const OUTRO_FADE = 1.6;  // fade in / fade out, сек
+const OUTRO_SPEED = 0.05; // макс добавка к скорости частиц на пике громкости outro
 
 function startOutro() {
   if (!outro) return;
@@ -290,6 +291,9 @@ function loop(now) {
     stepScale = parseFloat(stepEl.value);
     animSpeed = parseFloat(speedEl.value);
   }
+
+  // музыко-реактивно: текущая громкость outro ускоряет частицы (макс +OUTRO_SPEED)
+  if (outro && !outro.paused) animSpeed += OUTRO_SPEED * (outro.volume / OUTRO_VOL);
 
   const alive = simulate(realDt, animSpeed);
   distEl.textContent = 'у цели: ' + alive + ' / ' + count;
