@@ -43,25 +43,47 @@ const STRIDE_DT = 1 / 60;  // опорный интервал одного ша�
 const TL = window.TIMELINE;
 const A = TL.anchors;
 // keyframes: [время_сек, множитель_шага]
-const KF = [
-  [0,               5 ],  // старт: шаг 5 — путники идут к цели
-  [A.uvelichim,     7 ],  // "увеличим шаг" — начинаем разгон
-  [A.pereskakivaet, 11],  // "перескакивает" — перескок бьёт лучами через цель
-  [A.ne_mozhet,     14],  // "но не может"
-  [A.razbros,       20],  // "разброс" — облако широко разлетается
-  [A.beskonechnost, 35],  // "бесконечность" — разгон
-  [TL.duration,     80],  // улёт в бесконечность
+// шаг путника по словам
+const STEP_KF = [
+  [0,           2 ],  // "одна точка медленно идёт" — маленький шаг
+  [A.bolshe,    3 ],  // "чем больше шаг"
+  [A.promah,    12],  // "промахивается" — большой перескок
+  [A.eto,       7 ],  // "это один путник" — фиксируем средний
+  [TL.duration, 7 ],
 ];
-function stepFromTime(t) {
-  if (t <= KF[0][0]) return KF[0][1];
-  for (let i = 1; i < KF.length; i++) {
-    if (t <= KF[i][0]) {
-      const [t0, s0] = KF[i - 1], [t1, s1] = KF[i];
+// скорость анимации по словам (минимальная — чтобы рассмотреть пульсацию)
+const SPEED_KF = [
+  [0,            0.15],
+  [A.eto,        0.15],  // держим, пока показываем одного путника и набор ста
+  [A.minimalnoy, 0.05],  // "скорость оставим минимальной"
+  [TL.duration,  0.05],
+];
+// число точек — ступенями по словам
+const COUNT_CUES = [
+  [0,          1   ],
+  [A.sto,      100 ],  // "сто путников"
+  [A.tysyachu, 1000],  // "и тысячу"
+];
+
+function lerpKF(kf, t) {
+  if (t <= kf[0][0]) return kf[0][1];
+  for (let i = 1; i < kf.length; i++) {
+    if (t <= kf[i][0]) {
+      const [t0, s0] = kf[i - 1], [t1, s1] = kf[i];
       const k = (t - t0) / Math.max(1e-6, t1 - t0);
       return s0 + (s1 - s0) * k;
     }
   }
-  return KF[KF.length - 1][1];
+  return kf[kf.length - 1][1];
+}
+const stepFromTime = (t) => lerpKF(STEP_KF, t);
+const speedFromTime = (t) => lerpKF(SPEED_KF, t);
+function countFromTime(t) {
+  let c = COUNT_CUES[0][1];
+  for (let i = 0; i < COUNT_CUES.length; i++) {
+    if (t >= COUNT_CUES[i][0]) c = COUNT_CUES[i][1]; else break;
+  }
+  return c;
 }
 
 let particles;
@@ -226,10 +248,18 @@ function loop(now) {
   t0 = now;
   realDt = Math.min(realDt, 0.05);
 
-  let animSpeed = 1;   // в озвучке — реальное время (синк с аудио)
+  let animSpeed = 1;
   if (mode === 'play') {
     const at = narration.currentTime;
     stepScale = stepFromTime(at);
+    animSpeed = speedFromTime(at);
+    const wantCount = countFromTime(at);
+    if (wantCount !== count) {
+      count = wantCount;
+      countEl.value = count;
+      countreadEl.textContent = count;
+      reset(true);            // добавляем/пересоздаём путников — влетают заново
+    }
     updateSubtitle(at);
     if (narration.ended || at >= TL.duration - 0.02) enterStop();
   } else if (mode === 'idle') {
@@ -255,6 +285,9 @@ function loop(now) {
 
 // --- управление ---
 function play() {
+  count = 1;                    // сценарий стартует с одного путника
+  countEl.value = 1;
+  countreadEl.textContent = 1;
   reset(true);
   mode = 'play';
   curSent = -1;
